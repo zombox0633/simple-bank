@@ -129,7 +129,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET full_name = $2, updated_at = now()
 WHERE username = $1
-RETURNING username, password, full_name, created_at, updated_at
+RETURNING username, password, full_name, email, created_at, updated_at
 `
 
 type UpdateUserParams struct {

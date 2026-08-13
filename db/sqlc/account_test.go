@@ -89,7 +89,7 @@ func TestListAccounts(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	arg := ListAccountsParams{Owner: owner, Offset: 1} // ข้าม 1 ตัวแรก
+	arg := ListAccountsParams{Owner: owner, Limit: 2, Offset: 1} // ข้าม 1 ตัวแรก
 	accounts, err := testQueries.ListAccounts(context.Background(), arg)
 	require.NoError(t, err)
 	require.Len(t, accounts, len(currencies)-1) // 3 - 1 = 2
