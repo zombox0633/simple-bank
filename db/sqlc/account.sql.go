@@ -7,18 +7,22 @@ package db
 
 import (
 	"context"
+
+	"github.com/shopspring/decimal"
 )
 
 const addAccountBalance = `-- name: AddAccountBalance :one
 UPDATE accounts
-SET balance = balance + $1, updated_at = now()
+SET balance = balance + $1,
+    updated_at = now()
 WHERE id = $2
+    AND balance + $1 >= 0
 RETURNING id, owner, balance, currency, created_at, updated_at
 `
 
 type AddAccountBalanceParams struct {
-	Amount int64 `json:"amount"`
-	ID     int64 `json:"id"`
+	Amount decimal.Decimal `json:"amount"`
+	ID     int64           `json:"id"`
 }
 
 // เพิ่มหรือลดยอดแบบ atomic ภายใน PostgreSQL: amount บวกคือเงินเข้า ลบคือเงินออก
@@ -45,9 +49,9 @@ RETURNING id, owner, balance, currency, created_at, updated_at
 `
 
 type CreateAccountParams struct {
-	Owner    string `json:"owner"`
-	Balance  int64  `json:"balance"`
-	Currency string `json:"currency"`
+	Owner    string          `json:"owner"`
+	Balance  decimal.Decimal `json:"balance"`
+	Currency string          `json:"currency"`
 }
 
 // สร้างบัญชีใหม่และคืนแถวที่เพิ่งสร้าง รวมถึง id/timestamp ที่ PostgreSQL สร้างให้
@@ -81,7 +85,6 @@ SELECT id, owner, balance, currency, created_at, updated_at FROM accounts
 WHERE id = $1 LIMIT 1
 `
 
-// อ่านบัญชีหนึ่งรายการจาก primary key
 func (q *Queries) GetAccount(ctx context.Context, id int64) (Account, error) {
 	row := q.db.QueryRowContext(ctx, getAccount, id)
 	var i Account
@@ -110,7 +113,6 @@ type ListAccountsParams struct {
 	Offset int32  `json:"offset"`
 }
 
-// อ่านบัญชีของเจ้าของคนเดียวแบบแบ่งหน้า โดยเรียงตาม id เพื่อให้ผลลัพธ์คงที่
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]Account, error) {
 	rows, err := q.db.QueryContext(ctx, listAccounts, arg.Owner, arg.Limit, arg.Offset)
 	if err != nil {
@@ -149,8 +151,8 @@ RETURNING id, owner, balance, currency, created_at, updated_at
 `
 
 type UpdateAccountParams struct {
-	ID      int64 `json:"id"`
-	Balance int64 `json:"balance"`
+	ID      int64           `json:"id"`
+	Balance decimal.Decimal `json:"balance"`
 }
 
 // แทนที่ balance ด้วยยอดใหม่โดยตรง เหมาะกับงานที่รู้ยอดปลายทางแน่นอน

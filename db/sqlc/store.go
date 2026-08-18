@@ -3,8 +3,18 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+
+	"github.com/shopspring/decimal"
 )
+
+var (
+	ErrInvalidTransferAmount          = errors.New("transfer amount must be greater than zero")
+	ErrInvalidTransferAmountPrecision = errors.New("transfer amount must have at most 4 decimal places")
+)
+
+const moneyScale int32 = 4
 
 // Store รวม generated Queries สำหรับคำสั่งเดี่ยว และเก็บ connection pool
 // ไว้เริ่ม transaction ที่ต้องรันหลายคำสั่งเป็นหน่วยเดียวกัน
@@ -44,9 +54,9 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 
 // TransferTxParams คือข้อมูลที่จำเป็นสำหรับการโอนเงินหนึ่งครั้ง
 type TransferTxParams struct {
-	FromAccountID int64 `json:"from_account_id"`
-	ToAccountID   int64 `json:"to_account_id"`
-	Amount        int64 `json:"amount"`
+	FromAccountID int64           `json:"from_account_id"`
+	ToAccountID   int64           `json:"to_account_id"`
+	Amount        decimal.Decimal `json:"amount"`
 }
 
 // TransferTxResult รวมแถวทั้งหมดที่ถูกสร้างหรืออัปเดตภายใน transaction
@@ -62,6 +72,13 @@ type TransferTxResult struct {
 // TransferTx บันทึกการโอน เงินเข้า/ออกใน ledger และปรับยอดสองบัญชีแบบ atomic
 // ถ้าขั้นตอนใดผิดพลาด execTx จะ rollback ทุกขั้นตอน จึงไม่มีข้อมูลค้างเพียงบางส่วน
 func (s *Store) TransferTx(ctx context.Context, params TransferTxParams) (*TransferTxResult, error) {
+	if !params.Amount.GreaterThan(decimal.Zero) {
+		return nil, ErrInvalidTransferAmount
+	}
+	if !params.Amount.Equal(params.Amount.Round(moneyScale)) {
+		return nil, ErrInvalidTransferAmountPrecision
+	}
+
 	var result TransferTxResult
 
 	err := s.execTx(ctx, func(q *Queries) error {
@@ -81,7 +98,7 @@ func (s *Store) TransferTx(ctx context.Context, params TransferTxParams) (*Trans
 		// 2) เก็บ ledger entry ของต้นทางเป็นค่าลบและปลายทางเป็นค่าบวก
 		result.FromEntry, err = q.CreateEntry(ctx, CreateEntryParams{
 			AccountID: params.FromAccountID,
-			Amount:    -params.Amount,
+			Amount:    params.Amount.Neg(),
 		})
 
 		if err != nil {
@@ -102,14 +119,14 @@ func (s *Store) TransferTx(ctx context.Context, params TransferTxParams) (*Trans
 		if params.FromAccountID < params.ToAccountID {
 			result.FromAccount, result.ToAccount, err = addMoney(
 				ctx, q,
-				params.FromAccountID, -params.Amount,
+				params.FromAccountID, params.Amount.Neg(),
 				params.ToAccountID, params.Amount,
 			)
 		} else {
 			result.ToAccount, result.FromAccount, err = addMoney(
 				ctx, q,
 				params.ToAccountID, params.Amount,
-				params.FromAccountID, -params.Amount,
+				params.FromAccountID, params.Amount.Neg(),
 			)
 		}
 		return err
@@ -129,9 +146,9 @@ func addMoney(
 	ctx context.Context,
 	q *Queries,
 	firstAccountID int64,
-	firstBalanceChange int64,
+	firstBalanceChange decimal.Decimal,
 	secondAccountID int64,
-	secondBalanceChange int64,
+	secondBalanceChange decimal.Decimal,
 ) (firstUpdatedAccount Account, secondUpdatedAccount Account, err error) {
 	firstUpdatedAccount, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
 		ID:     firstAccountID,

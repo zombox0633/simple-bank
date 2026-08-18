@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // pgx แบบ database/sql
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -50,8 +51,28 @@ func randomInt(min, max int64) int64 {
 	return min + rand.Int63n(max-min+1)
 }
 
-func randomMoney() int64 {
-	return randomInt(0, 1000)
+func randomMoney() decimal.Decimal {
+	// สุ่มทั้งส่วนจำนวนเต็มและเศษ 4 ตำแหน่ง เช่น 123.4567
+	return decimal.New(randomInt(0, 1000)*10_000+randomInt(0, 9_999), -moneyScale)
+}
+
+func randomPositiveMoney() decimal.Decimal {
+	return decimal.New(randomInt(1, 1000)*10_000+randomInt(0, 9_999), -moneyScale)
+}
+
+func mustDecimal(value string) decimal.Decimal {
+	amount, err := decimal.NewFromString(value)
+	if err != nil {
+		panic(err)
+	}
+	return amount
+}
+
+func requireDecimalEqual(t *testing.T, expected, actual decimal.Decimal) {
+	t.Helper()
+	if !expected.Equal(actual) {
+		t.Fatalf("decimal values differ: expected %s, actual %s", expected, actual)
+	}
 }
 
 func randomCurrency() string {

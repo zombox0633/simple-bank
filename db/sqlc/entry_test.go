@@ -20,7 +20,7 @@ func createRandomEntry(t *testing.T) Entry {
 	require.NotEmpty(t, entry)
 
 	require.Equal(t, arg.AccountID, entry.AccountID)
-	require.Equal(t, arg.Amount, entry.Amount)
+	requireDecimalEqual(t, arg.Amount, entry.Amount)
 	require.NotZero(t, entry.ID)
 	require.NotZero(t, entry.CreatedAt)
 
@@ -40,7 +40,7 @@ func TestGetEntry(t *testing.T) {
 
 	require.Equal(t, entry1.ID, entry2.ID)
 	require.Equal(t, entry1.AccountID, entry2.AccountID)
-	require.Equal(t, entry1.Amount, entry2.Amount)
+	requireDecimalEqual(t, entry1.Amount, entry2.Amount)
 	require.WithinDuration(t, entry1.CreatedAt, entry2.CreatedAt, time.Second)
 }
 

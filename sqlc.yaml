@@ -9,5 +9,11 @@ sql:
         out: "db/sqlc"
         emit_json_tags: true
         overrides:
+          # PostgreSQL NUMERIC(18,4) และ decimal.Decimal คำนวณแบบ exact
+          # จึงรองรับเงิน 4 ตำแหน่งโดยไม่ผ่าน float64
+          - db_type: "pg_catalog.numeric"
+            go_type:
+              import: "github.com/shopspring/decimal"
+              type: "Decimal"
           - column: "users.password"
             go_struct_tag: 'json:"-"'   # password ไม่ serialize ออก JSON เด็ดขาด

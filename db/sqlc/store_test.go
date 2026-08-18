@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,13 +15,18 @@ func TestTransferTx(t *testing.T) {
 	store := NewStore(testDB)
 	fromAccount := createRandomAccount(t)
 	toAccount := createRandomAccount(t)
+	fromAccount, err := testQueries.UpdateAccount(context.Background(), UpdateAccountParams{
+		ID:      fromAccount.ID,
+		Balance: mustDecimal("1000.0000"),
+	})
+	require.NoError(t, err)
 	t.Logf("fromAccount: %+v, toAccount: %+v", fromAccount, toAccount)
 
-	// จำลองการโอนเงินพร้อมกัน 5 ครั้ง ครั้งละ 10 หน่วย
+	// จำลองการโอนเงินพร้อมกัน 5 ครั้ง ครั้งละ 10.1234 หน่วย
 	// การรันพร้อมกันช่วยทดสอบว่า database transaction ป้องกันยอดเงินสูญหาย
 	// หรือถูกเขียนทับเมื่อหลาย goroutine อัปเดตบัญชีเดียวกันหรือไม่
 	const n = 5
-	const amount int64 = 10
+	amount := mustDecimal("10.1234")
 
 	// ใช้ buffered channels ขนาด n เพื่อรับ error และผลลัพธ์จากทุก goroutine
 	// โดย goroutine สามารถส่งผลกลับมาได้โดยไม่ต้องรอให้ test เริ่มอ่านทันที
@@ -55,7 +61,7 @@ func TestTransferTx(t *testing.T) {
 		require.NotZero(t, transfer.ID)
 		require.Equal(t, fromAccount.ID, transfer.FromAccountID)
 		require.Equal(t, toAccount.ID, transfer.ToAccountID)
-		require.Equal(t, amount, transfer.Amount)
+		requireDecimalEqual(t, amount, transfer.Amount)
 
 		// อ่าน transfer จากฐานข้อมูลอีกครั้ง เพื่อยืนยันว่า record ถูก commit จริง
 		dbTransfer, err := testQueries.GetTransfer(context.Background(), transfer.ID)
@@ -66,27 +72,27 @@ func TestTransferTx(t *testing.T) {
 		fromEntry := result.FromEntry
 		require.NotZero(t, fromEntry.ID)
 		require.Equal(t, fromAccount.ID, fromEntry.AccountID)
-		require.Equal(t, -amount, fromEntry.Amount)
+		requireDecimalEqual(t, amount.Neg(), fromEntry.Amount)
 
 		// บัญชีปลายทางต้องมี entry เป็นบวก เพราะเป็นเงินเข้า
 		toEntry := result.ToEntry
 		require.NotZero(t, toEntry.ID)
 		require.Equal(t, toAccount.ID, toEntry.AccountID)
-		require.Equal(t, amount, toEntry.Amount)
+		requireDecimalEqual(t, amount, toEntry.Amount)
 
 		// เงินที่หายจากต้นทางต้องเท่ากับเงินที่เพิ่มให้ปลายทางเสมอ
 		// และส่วนต่างต้องเพิ่มทีละ amount โดยไม่มีค่าค้างระหว่างทาง
-		fromDiff := fromAccount.Balance - result.FromAccount.Balance
-		toDiff := result.ToAccount.Balance - toAccount.Balance
-		t.Logf("fromDiff: %d, toDiff: %d", fromDiff, toDiff)
+		fromDiff := fromAccount.Balance.Sub(result.FromAccount.Balance)
+		toDiff := result.ToAccount.Balance.Sub(toAccount.Balance)
+		t.Logf("fromDiff: %s, toDiff: %s", fromDiff, toDiff)
 
-		require.Equal(t, fromDiff, toDiff)
-		require.Positive(t, fromDiff)
-		require.Zero(t, fromDiff%amount)
+		requireDecimalEqual(t, fromDiff, toDiff)
+		require.True(t, fromDiff.IsPositive())
+		require.True(t, fromDiff.Mod(amount).IsZero())
 
 		// แปลงส่วนต่างเป็นลำดับ transaction แล้วตรวจว่าครบและไม่ซ้ำกัน
 		// ไม่จำเป็นต้องเรียง 1 ถึง n เพราะ goroutine อาจทำเสร็จคนละลำดับกับตอนเริ่ม
-		step := int(fromDiff / amount)
+		step := int(fromDiff.Div(amount).IntPart())
 		require.GreaterOrEqual(t, step, 1)
 		require.LessOrEqual(t, step, n)
 		require.NotContains(t, executed, step)
@@ -101,19 +107,29 @@ func TestTransferTx(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("updatedFromAccount: %+v, updatedToAccount: %+v", updatedFromAccount, updatedToAccount)
-	require.Equal(t, fromAccount.Balance-int64(n)*amount, updatedFromAccount.Balance)
-	require.Equal(t, toAccount.Balance+int64(n)*amount, updatedToAccount.Balance)
+	totalAmount := amount.Mul(decimal.NewFromInt(n))
+	requireDecimalEqual(t, fromAccount.Balance.Sub(totalAmount), updatedFromAccount.Balance)
+	requireDecimalEqual(t, toAccount.Balance.Add(totalAmount), updatedToAccount.Balance)
 }
 
 func TestTransferTxDeadlock(t *testing.T) {
 	store := NewStore(testDB)
 	account1 := createRandomAccount(t)
 	account2 := createRandomAccount(t)
+	var err error
+	account1, err = testQueries.UpdateAccount(context.Background(), UpdateAccountParams{
+		ID: account1.ID, Balance: mustDecimal("1000.0000"),
+	})
+	require.NoError(t, err)
+	account2, err = testQueries.UpdateAccount(context.Background(), UpdateAccountParams{
+		ID: account2.ID, Balance: mustDecimal("1000.0000"),
+	})
+	require.NoError(t, err)
 
 	// ครึ่งหนึ่งโอน 1 -> 2 และอีกครึ่งโอน 2 -> 1 พร้อมกัน
 	// ถ้าแต่ละ transaction lock ต้นทางก่อน จะเกิดวงจรรอ lock ได้
 	const n = 10
-	const amount int64 = 10
+	amount := mustDecimal("10.1234")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -151,6 +167,20 @@ func TestTransferTxDeadlock(t *testing.T) {
 	updatedAccount2, err := testQueries.GetAccount(context.Background(), account2.ID)
 	require.NoError(t, err)
 
-	require.Equal(t, account1.Balance, updatedAccount1.Balance)
-	require.Equal(t, account2.Balance, updatedAccount2.Balance)
+	requireDecimalEqual(t, account1.Balance, updatedAccount1.Balance)
+	requireDecimalEqual(t, account2.Balance, updatedAccount2.Balance)
+}
+
+func TestTransferTxRejectsInvalidAmount(t *testing.T) {
+	store := &Store{}
+
+	_, err := store.TransferTx(context.Background(), TransferTxParams{
+		Amount: decimal.Zero,
+	})
+	require.ErrorIs(t, err, ErrInvalidTransferAmount)
+
+	_, err = store.TransferTx(context.Background(), TransferTxParams{
+		Amount: mustDecimal("1.23456"),
+	})
+	require.ErrorIs(t, err, ErrInvalidTransferAmountPrecision)
 }
