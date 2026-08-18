@@ -11,18 +11,21 @@ import (
 
 const addAccountBalance = `-- name: AddAccountBalance :one
 UPDATE accounts
-SET balance = balance + $2, updated_at = now()
-WHERE id = $1
+SET balance = balance + $1, updated_at = now()
+WHERE id = $2
 RETURNING id, owner, balance, currency, created_at, updated_at
 `
 
 type AddAccountBalanceParams struct {
-	ID      int64 `json:"id"`
-	Balance int64 `json:"balance"`
+	Amount int64 `json:"amount"`
+	ID     int64 `json:"id"`
 }
 
+// เพิ่มหรือลดยอดแบบ atomic ภายใน PostgreSQL: amount บวกคือเงินเข้า ลบคือเงินออก
+// การใช้ UPDATE คำสั่งเดียวช่วยไม่ให้ concurrent transaction อ่านยอดเดิมแล้วเขียนทับกัน
+// sqlc.arg กำหนดชื่อ field ใน AddAccountBalanceParams ให้เป็น Amount และ ID อย่างชัดเจน
 func (q *Queries) AddAccountBalance(ctx context.Context, arg AddAccountBalanceParams) (Account, error) {
-	row := q.db.QueryRowContext(ctx, addAccountBalance, arg.ID, arg.Balance)
+	row := q.db.QueryRowContext(ctx, addAccountBalance, arg.Amount, arg.ID)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -47,6 +50,7 @@ type CreateAccountParams struct {
 	Currency string `json:"currency"`
 }
 
+// สร้างบัญชีใหม่และคืนแถวที่เพิ่งสร้าง รวมถึง id/timestamp ที่ PostgreSQL สร้างให้
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error) {
 	row := q.db.QueryRowContext(ctx, createAccount, arg.Owner, arg.Balance, arg.Currency)
 	var i Account
@@ -66,6 +70,7 @@ DELETE FROM accounts
 WHERE id = $1
 `
 
+// ลบบัญชีด้วย primary key; foreign key constraints จะป้องกันการลบที่ทำให้ข้อมูลอ้างอิงเสีย
 func (q *Queries) DeleteAccount(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteAccount, id)
 	return err
@@ -76,6 +81,7 @@ SELECT id, owner, balance, currency, created_at, updated_at FROM accounts
 WHERE id = $1 LIMIT 1
 `
 
+// อ่านบัญชีหนึ่งรายการจาก primary key
 func (q *Queries) GetAccount(ctx context.Context, id int64) (Account, error) {
 	row := q.db.QueryRowContext(ctx, getAccount, id)
 	var i Account
@@ -104,6 +110,7 @@ type ListAccountsParams struct {
 	Offset int32  `json:"offset"`
 }
 
+// อ่านบัญชีของเจ้าของคนเดียวแบบแบ่งหน้า โดยเรียงตาม id เพื่อให้ผลลัพธ์คงที่
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]Account, error) {
 	rows, err := q.db.QueryContext(ctx, listAccounts, arg.Owner, arg.Limit, arg.Offset)
 	if err != nil {
@@ -146,6 +153,8 @@ type UpdateAccountParams struct {
 	Balance int64 `json:"balance"`
 }
 
+// แทนที่ balance ด้วยยอดใหม่โดยตรง เหมาะกับงานที่รู้ยอดปลายทางแน่นอน
+// สำหรับการเพิ่ม/ลดจากยอดเดิม โดยเฉพาะ money transfer ให้ใช้ AddAccountBalance
 func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error) {
 	row := q.db.QueryRowContext(ctx, updateAccount, arg.ID, arg.Balance)
 	var i Account
