@@ -36,6 +36,8 @@ func main() {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
+	//test ci
+
 	if err := r.Run(addr); err != nil {
 		log.Fatal("cannot start server 🙀 : ", err)
 	}
