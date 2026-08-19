@@ -8,6 +8,7 @@ sql:
         package: "db"
         out: "db/sqlc"
         emit_json_tags: true
+        emit_empty_slices: true
         overrides:
           # PostgreSQL NUMERIC(18,4) และ decimal.Decimal คำนวณแบบ exact
           # จึงรองรับเงิน 4 ตำแหน่งโดยไม่ผ่าน float64
