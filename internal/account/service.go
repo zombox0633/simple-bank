@@ -2,12 +2,12 @@ package account
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
+	"github.com/govalues/decimal"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/shopspring/decimal"
 
 	db "simplebank/db/sqlc"
 	"simplebank/internal/common"
@@ -47,7 +47,7 @@ func (service *Service) CreateAccount(
 func (service *Service) GetAccount(ctx context.Context, id int64) (db.Account, error) {
 	account, err := service.store.GetAccount(ctx, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return db.Account{}, common.ErrNotFound
 		}
 		return db.Account{}, fmt.Errorf("get account: %w", err)

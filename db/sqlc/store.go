@@ -2,30 +2,26 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
-	"github.com/shopspring/decimal"
-)
+	"github.com/govalues/decimal"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
-var (
-	ErrInvalidTransferAmount          = errors.New("transfer amount must be greater than zero")
-	ErrInvalidTransferAmountPrecision = errors.New("transfer amount must have at most 4 decimal places")
+	"simplebank/internal/common"
 )
-
-const moneyScale int32 = 4
 
 // Store รวม generated Queries สำหรับคำสั่งเดี่ยว และเก็บ connection pool
 // ไว้เริ่ม transaction ที่ต้องรันหลายคำสั่งเป็นหน่วยเดียวกัน
 type Store struct {
 	*Queries
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // NewStore สร้าง Store ที่ใช้ database connection pool เดียวกันทั้ง query ปกติ
 // และ transaction
-func NewStore(db *sql.DB) *Store {
+func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{
 		db:      db,
 		Queries: New(db),
@@ -35,7 +31,7 @@ func NewStore(db *sql.DB) *Store {
 // execTx ครอบ callback ด้วย database transaction:
 // callback สำเร็จจึง commit และถ้า callback ล้มเหลวจะ rollback ทุกคำสั่งที่ผ่านมา
 func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -44,12 +40,12 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 	q := New(tx)
 	err = fn(q)
 	if err != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			return fmt.Errorf("tx err: %v, rollback error: %v", err, rbErr)
+		if rbErr := tx.Rollback(ctx); rbErr != nil {
+			return errors.Join(err, fmt.Errorf("rollback transaction: %w", rbErr))
 		}
 		return err
 	}
-	return tx.Commit()
+	return tx.Commit(ctx)
 }
 
 // TransferTxParams คือข้อมูลที่จำเป็นสำหรับการโอนเงินหนึ่งครั้ง
@@ -72,11 +68,11 @@ type TransferTxResult struct {
 // TransferTx บันทึกการโอน เงินเข้า/ออกใน ledger และปรับยอดสองบัญชีแบบ atomic
 // ถ้าขั้นตอนใดผิดพลาด execTx จะ rollback ทุกขั้นตอน จึงไม่มีข้อมูลค้างเพียงบางส่วน
 func (s *Store) TransferTx(ctx context.Context, params TransferTxParams) (*TransferTxResult, error) {
-	if !params.Amount.GreaterThan(decimal.Zero) {
-		return nil, ErrInvalidTransferAmount
+	if params.FromAccountID == params.ToAccountID {
+		return nil, common.ErrSameAccount
 	}
-	if !params.Amount.Equal(params.Amount.Round(moneyScale)) {
-		return nil, ErrInvalidTransferAmountPrecision
+	if !common.IsValidMoneyAmount(params.Amount) {
+		return nil, common.ErrInvalidAmount
 	}
 
 	var result TransferTxResult
@@ -150,17 +146,30 @@ func addMoney(
 	secondAccountID int64,
 	secondBalanceChange decimal.Decimal,
 ) (firstUpdatedAccount Account, secondUpdatedAccount Account, err error) {
-	firstUpdatedAccount, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
-		ID:     firstAccountID,
-		Amount: firstBalanceChange,
-	})
+	firstUpdatedAccount, err = updateAccountBalance(ctx, q, firstAccountID, firstBalanceChange)
 	if err != nil {
 		return
 	}
 
-	secondUpdatedAccount, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
-		ID:     secondAccountID,
-		Amount: secondBalanceChange,
-	})
+	secondUpdatedAccount, err = updateAccountBalance(ctx, q, secondAccountID, secondBalanceChange)
 	return
+}
+
+func updateAccountBalance(
+	ctx context.Context,
+	q *Queries,
+	accountID int64,
+	balanceChange decimal.Decimal,
+) (Account, error) {
+	account, err := q.AddAccountBalance(ctx, AddAccountBalanceParams{
+		ID:     accountID,
+		Amount: balanceChange,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		if balanceChange.IsNeg() {
+			return Account{}, common.ErrInsufficientBalance
+		}
+		return Account{}, common.ErrBalanceLimitExceeded
+	}
+	return account, err
 }

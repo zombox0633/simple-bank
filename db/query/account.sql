@@ -32,6 +32,7 @@ SET balance = balance + sqlc.arg(amount),
     updated_at = now()
 WHERE id = sqlc.arg(id)
     AND balance + sqlc.arg(amount) >= 0
+    AND balance + sqlc.arg(amount) <= 99999999999999.9999
 RETURNING *;
 
 -- name: DeleteAccount :exec

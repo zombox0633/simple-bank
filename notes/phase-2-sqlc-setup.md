@@ -66,8 +66,8 @@ sql:
 ```
 
 ## จุดที่น่าจดจำ
-- ใช้ `database/sql` (stdlib) → โค้ดที่ gen ออกมา **ไม่มี dependency ภายนอกเลย** (`go.mod` ว่าง)
-  driver จริง (เช่น `lib/pq` / `pgx`) ค่อยเพิ่มตอนต่อ DB จริง
+- ตั้ง `sql_package: pgx/v5` เพื่อ generate native pgx API และใช้ `pgxpool` เชื่อม PostgreSQL
+- money model ใช้ `govalues/decimal` ตาม type override เพื่อเก็บ `NUMERIC(18,4)` แบบ exact
 - ใน query ใช้ comment สั่งงาน sqlc:
   - `-- name: CreateAccount :one` → คืน 1 row
   - `:many` → คืนหลาย row, `:exec` → ไม่คืนค่า

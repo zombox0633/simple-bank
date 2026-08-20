@@ -22,6 +22,11 @@ func TestWriteError(t *testing.T) {
 		wantCode   string
 	}{
 		{common.ErrUnsupportedCurrency, http.StatusBadRequest, "UNSUPPORTED_CURRENCY"},
+		{common.ErrCurrencyMismatch, http.StatusBadRequest, "CURRENCY_MISMATCH"},
+		{common.ErrInvalidAmount, http.StatusBadRequest, "INVALID_AMOUNT"},
+		{common.ErrSameAccount, http.StatusBadRequest, "SAME_ACCOUNT"},
+		{common.ErrInsufficientBalance, http.StatusBadRequest, "INSUFFICIENT_BALANCE"},
+		{common.ErrBalanceLimitExceeded, http.StatusBadRequest, "BALANCE_LIMIT_EXCEEDED"},
 		{common.ErrNotFound, http.StatusNotFound, "NOT_FOUND"},
 		{common.ErrInvalidReference, http.StatusBadRequest, "INVALID_REFERENCE"},
 		{common.ErrConflict, http.StatusConflict, "CONFLICT"},
@@ -39,4 +44,17 @@ func TestWriteError(t *testing.T) {
 		require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 		require.Equal(t, test.wantCode, response.Code)
 	}
+}
+
+func TestWriteRequestErrorHidesParserDetails(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+
+	WriteRequestError(ctx, errors.New("private parser detail"))
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	var response errorResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, "INVALID_REQUEST", response.Code)
+	require.Equal(t, "invalid request", response.Error)
 }

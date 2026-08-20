@@ -2,10 +2,10 @@ package account
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 
@@ -72,7 +72,7 @@ func TestServiceCreateAccountRejectsUnsupportedCurrency(t *testing.T) {
 func TestServiceGetAccountMapsNotFound(t *testing.T) {
 	store := &stubStore{
 		getAccount: func(_ context.Context, _ int64) (db.Account, error) {
-			return db.Account{}, sql.ErrNoRows
+			return db.Account{}, pgx.ErrNoRows
 		},
 	}
 

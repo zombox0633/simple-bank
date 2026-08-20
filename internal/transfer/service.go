@@ -2,11 +2,9 @@ package transfer
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
-	"github.com/shopspring/decimal"
+	"github.com/govalues/decimal"
 
 	db "simplebank/db/sqlc"
 	"simplebank/internal/common"
@@ -53,8 +51,12 @@ func (service *Service) CreateTransfer(
 	if toAccount.Currency != currency {
 		return nil, fmt.Errorf("%w: account %d uses %s", common.ErrCurrencyMismatch, toAccount.ID, toAccount.Currency)
 	}
-	if fromAccount.Balance.LessThan(amount) {
+	if fromAccount.Balance.Less(amount) {
 		return nil, common.ErrInsufficientBalance
+	}
+	destinationBalance, err := toAccount.Balance.AddExact(amount, common.MoneyScale)
+	if err != nil || destinationBalance.Cmp(common.MaxMoneyAmount) > 0 {
+		return nil, common.ErrBalanceLimitExceeded
 	}
 
 	result, err := service.store.TransferTx(ctx, db.TransferTxParams{
@@ -63,14 +65,7 @@ func (service *Service) CreateTransfer(
 		Amount:        amount,
 	})
 	if err != nil {
-		switch {
-		case errors.Is(err, sql.ErrNoRows):
-			return nil, common.ErrInsufficientBalance
-		case errors.Is(err, db.ErrInvalidTransferAmount), errors.Is(err, db.ErrInvalidTransferAmountPrecision):
-			return nil, common.ErrInvalidAmount
-		default:
-			return nil, fmt.Errorf("transfer money: %w", err)
-		}
+		return nil, fmt.Errorf("transfer money: %w", err)
 	}
 
 	return result, nil

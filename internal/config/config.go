@@ -10,7 +10,6 @@ import (
 )
 
 type Config struct {
-	DBDriver      string `env:"DB_DRIVER" envDefault:"pgx"`
 	DBSource      string `env:"DB_SOURCE,required,notEmpty"`
 	ServerAddress string `env:"SERVER_ADDRESS" envDefault:":8080"`
 }

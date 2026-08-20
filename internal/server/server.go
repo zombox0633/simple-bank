@@ -40,10 +40,6 @@ func New(store Store) *Server {
 	return &Server{router: router}
 }
 
-func (server *Server) Start(address string) error {
-	return server.router.Run(address)
-}
-
 // Handler เปิด http.Handler สำหรับทดสอบ routes โดยไม่ต้องเปิด TCP port จริง
 func (server *Server) Handler() http.Handler {
 	return server.router

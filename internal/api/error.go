@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 
 	"simplebank/internal/common"
 )
@@ -16,7 +17,24 @@ type errorResponse struct {
 }
 
 func WriteRequestError(ctx *gin.Context, err error) {
-	writeError(ctx, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+	var validationErrors validator.ValidationErrors
+	if errors.As(err, &validationErrors) {
+		for _, validationError := range validationErrors {
+			switch validationError.Tag() {
+			case "money":
+				WriteError(ctx, common.ErrInvalidAmount)
+				return
+			case "currency":
+				WriteError(ctx, common.ErrUnsupportedCurrency)
+				return
+			case "nefield":
+				WriteError(ctx, common.ErrSameAccount)
+				return
+			}
+		}
+	}
+
+	writeError(ctx, http.StatusBadRequest, "INVALID_REQUEST", "invalid request")
 }
 
 // WriteError turns reusable application errors into one consistent HTTP shape.
@@ -32,6 +50,8 @@ func WriteError(ctx *gin.Context, err error) {
 		writeError(ctx, http.StatusBadRequest, "SAME_ACCOUNT", common.ErrSameAccount.Error())
 	case errors.Is(err, common.ErrInsufficientBalance):
 		writeError(ctx, http.StatusBadRequest, "INSUFFICIENT_BALANCE", common.ErrInsufficientBalance.Error())
+	case errors.Is(err, common.ErrBalanceLimitExceeded):
+		writeError(ctx, http.StatusBadRequest, "BALANCE_LIMIT_EXCEEDED", common.ErrBalanceLimitExceeded.Error())
 	case errors.Is(err, common.ErrNotFound):
 		writeError(ctx, http.StatusNotFound, "NOT_FOUND", common.ErrNotFound.Error())
 	case errors.Is(err, common.ErrInvalidReference):

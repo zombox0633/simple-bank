@@ -8,7 +8,7 @@ package db
 import (
 	"context"
 
-	"github.com/shopspring/decimal"
+	"github.com/govalues/decimal"
 )
 
 const addAccountBalance = `-- name: AddAccountBalance :one
@@ -17,6 +17,7 @@ SET balance = balance + $1,
     updated_at = now()
 WHERE id = $2
     AND balance + $1 >= 0
+    AND balance + $1 <= 99999999999999.9999
 RETURNING id, owner, balance, currency, created_at, updated_at
 `
 
@@ -29,7 +30,7 @@ type AddAccountBalanceParams struct {
 // การใช้ UPDATE คำสั่งเดียวช่วยไม่ให้ concurrent transaction อ่านยอดเดิมแล้วเขียนทับกัน
 // sqlc.arg กำหนดชื่อ field ใน AddAccountBalanceParams ให้เป็น Amount และ ID อย่างชัดเจน
 func (q *Queries) AddAccountBalance(ctx context.Context, arg AddAccountBalanceParams) (Account, error) {
-	row := q.db.QueryRowContext(ctx, addAccountBalance, arg.Amount, arg.ID)
+	row := q.db.QueryRow(ctx, addAccountBalance, arg.Amount, arg.ID)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -56,7 +57,7 @@ type CreateAccountParams struct {
 
 // สร้างบัญชีใหม่และคืนแถวที่เพิ่งสร้าง รวมถึง id/timestamp ที่ PostgreSQL สร้างให้
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error) {
-	row := q.db.QueryRowContext(ctx, createAccount, arg.Owner, arg.Balance, arg.Currency)
+	row := q.db.QueryRow(ctx, createAccount, arg.Owner, arg.Balance, arg.Currency)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -76,7 +77,7 @@ WHERE id = $1
 
 // ลบบัญชีด้วย primary key; foreign key constraints จะป้องกันการลบที่ทำให้ข้อมูลอ้างอิงเสีย
 func (q *Queries) DeleteAccount(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteAccount, id)
+	_, err := q.db.Exec(ctx, deleteAccount, id)
 	return err
 }
 
@@ -86,7 +87,7 @@ WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetAccount(ctx context.Context, id int64) (Account, error) {
-	row := q.db.QueryRowContext(ctx, getAccount, id)
+	row := q.db.QueryRow(ctx, getAccount, id)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -114,7 +115,7 @@ type ListAccountsParams struct {
 }
 
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]Account, error) {
-	rows, err := q.db.QueryContext(ctx, listAccounts, arg.Owner, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listAccounts, arg.Owner, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -133,9 +134,6 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]A
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -158,7 +156,7 @@ type UpdateAccountParams struct {
 // แทนที่ balance ด้วยยอดใหม่โดยตรง เหมาะกับงานที่รู้ยอดปลายทางแน่นอน
 // สำหรับการเพิ่ม/ลดจากยอดเดิม โดยเฉพาะ money transfer ให้ใช้ AddAccountBalance
 func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error) {
-	row := q.db.QueryRowContext(ctx, updateAccount, arg.ID, arg.Balance)
+	row := q.db.QueryRow(ctx, updateAccount, arg.ID, arg.Balance)
 	var i Account
 	err := row.Scan(
 		&i.ID,

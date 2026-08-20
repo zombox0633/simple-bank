@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/shopspring/decimal"
+	"github.com/govalues/decimal"
 
 	"simplebank/internal/common"
 )

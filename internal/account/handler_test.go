@@ -1,7 +1,7 @@
 package account
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
+	"github.com/govalues/decimal"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	db "simplebank/db/sqlc"
 )
@@ -24,38 +25,36 @@ func TestGetAccountAPI(t *testing.T) {
 	wantAccount := db.Account{
 		ID:        42,
 		Owner:     "alice",
-		Balance:   decimal.RequireFromString("100.2500"),
+		Balance:   decimal.MustParse("100.2500"),
 		Currency:  "THB",
-		CreatedAt: time.Date(2026, time.August, 19, 10, 0, 0, 0, time.UTC),
-		UpdatedAt: time.Date(2026, time.August, 19, 10, 0, 0, 0, time.UTC),
+		CreatedAt: pgtype.Timestamptz{Time: time.Date(2026, time.August, 19, 10, 0, 0, 0, time.UTC), Valid: true},
+		UpdatedAt: pgtype.Timestamptz{Time: time.Date(2026, time.August, 19, 10, 0, 0, 0, time.UTC), Valid: true},
 	}
 
 	tests := []struct {
 		name       string
 		accountID  int64
-		buildMock  func(*MockStore)
+		buildStore func(*testing.T) *stubStore
 		wantStatus int
 		wantCode   string
 	}{
 		{
 			name:      "OK",
 			accountID: wantAccount.ID,
-			buildMock: func(store *MockStore) {
-				store.EXPECT().
-					GetAccount(gomock.Any(), wantAccount.ID).
-					Times(1).
-					Return(wantAccount, nil)
+			buildStore: func(_ *testing.T) *stubStore {
+				return &stubStore{getAccount: func(context.Context, int64) (db.Account, error) {
+					return wantAccount, nil
+				}}
 			},
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:      "NotFound",
 			accountID: wantAccount.ID,
-			buildMock: func(store *MockStore) {
-				store.EXPECT().
-					GetAccount(gomock.Any(), wantAccount.ID).
-					Times(1).
-					Return(db.Account{}, sql.ErrNoRows)
+			buildStore: func(_ *testing.T) *stubStore {
+				return &stubStore{getAccount: func(context.Context, int64) (db.Account, error) {
+					return db.Account{}, pgx.ErrNoRows
+				}}
 			},
 			wantStatus: http.StatusNotFound,
 			wantCode:   "NOT_FOUND",
@@ -63,11 +62,10 @@ func TestGetAccountAPI(t *testing.T) {
 		{
 			name:      "InternalError",
 			accountID: wantAccount.ID,
-			buildMock: func(store *MockStore) {
-				store.EXPECT().
-					GetAccount(gomock.Any(), wantAccount.ID).
-					Times(1).
-					Return(db.Account{}, errors.New("connection error"))
+			buildStore: func(_ *testing.T) *stubStore {
+				return &stubStore{getAccount: func(context.Context, int64) (db.Account, error) {
+					return db.Account{}, errors.New("connection error")
+				}}
 			},
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   "INTERNAL_ERROR",
@@ -75,7 +73,7 @@ func TestGetAccountAPI(t *testing.T) {
 		{
 			name:       "InvalidID",
 			accountID:  0,
-			buildMock:  func(*MockStore) {},
+			buildStore: func(*testing.T) *stubStore { return &stubStore{} },
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "INVALID_REQUEST",
 		},
@@ -83,8 +81,7 @@ func TestGetAccountAPI(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			store := NewMockStore(gomock.NewController(t))
-			test.buildMock(store)
+			store := test.buildStore(t)
 
 			router := gin.New()
 			NewHandler(NewService(store)).RegisterRoutes(router)

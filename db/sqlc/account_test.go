@@ -2,10 +2,10 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +44,7 @@ func TestGetAccount(t *testing.T) {
 	require.Equal(t, account1.Owner, account2.Owner)
 	requireDecimalEqual(t, account1.Balance, account2.Balance)
 	require.Equal(t, account1.Currency, account2.Currency)
-	require.WithinDuration(t, account1.CreatedAt, account2.CreatedAt, time.Second)
+	require.WithinDuration(t, account1.CreatedAt.Time, account2.CreatedAt.Time, time.Second)
 }
 
 func TestUpdateAccount(t *testing.T) {
@@ -71,19 +71,17 @@ func TestDeleteAccount(t *testing.T) {
 	err := testQueries.DeleteAccount(context.Background(), account1.ID)
 	require.NoError(t, err)
 
-	// ดึงมาอีกที ต้องไม่เจอแล้ว → sql.ErrNoRows
+	// ดึงมาอีกที ต้องไม่เจอแล้ว → pgx.ErrNoRows
 	account2, err := testQueries.GetAccount(context.Background(), account1.ID)
-	require.Error(t, err)
-	require.EqualError(t, err, sql.ErrNoRows.Error())
+	require.ErrorIs(t, err, pgx.ErrNoRows)
 	require.Empty(t, account2)
 }
 
 func TestListAccounts(t *testing.T) {
 	owner := createRandomUser(t).Username
-	currencies := []string{"USD", "EUR", "THB"}
 
 	// 1 owner มีได้หลาย account ถ้าคนละ currency (เพราะติด unique(owner, currency))
-	for _, cur := range currencies {
+	for _, cur := range testCurrencies {
 		arg := CreateAccountParams{Owner: owner, Balance: randomMoney(), Currency: cur}
 		_, err := testQueries.CreateAccount(context.Background(), arg)
 		require.NoError(t, err)
@@ -92,7 +90,7 @@ func TestListAccounts(t *testing.T) {
 	arg := ListAccountsParams{Owner: owner, Limit: 2, Offset: 1} // ข้าม 1 ตัวแรก
 	accounts, err := testQueries.ListAccounts(context.Background(), arg)
 	require.NoError(t, err)
-	require.Len(t, accounts, len(currencies)-1) // 3 - 1 = 2
+	require.Len(t, accounts, len(testCurrencies)-1) // 3 - 1 = 2
 
 	for _, a := range accounts {
 		require.NotEmpty(t, a)

@@ -3,14 +3,14 @@ module simplebank
 go 1.26.5
 
 require (
+	github.com/ColeBurch/pgx-govalues-decimal v0.1.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1
+	github.com/govalues/decimal v0.1.36
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
-	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/mock v0.6.0
 )
 
 require (

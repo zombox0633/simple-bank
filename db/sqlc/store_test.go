@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shopspring/decimal"
+	"github.com/govalues/decimal"
 	"github.com/stretchr/testify/require"
+
+	"simplebank/internal/common"
 )
 
 func TestTransferTx(t *testing.T) {
@@ -82,17 +84,20 @@ func TestTransferTx(t *testing.T) {
 
 		// เงินที่หายจากต้นทางต้องเท่ากับเงินที่เพิ่มให้ปลายทางเสมอ
 		// และส่วนต่างต้องเพิ่มทีละ amount โดยไม่มีค่าค้างระหว่างทาง
-		fromDiff := fromAccount.Balance.Sub(result.FromAccount.Balance)
-		toDiff := result.ToAccount.Balance.Sub(toAccount.Balance)
+		fromDiff := mustSub(t, fromAccount.Balance, result.FromAccount.Balance)
+		toDiff := mustSub(t, result.ToAccount.Balance, toAccount.Balance)
 		t.Logf("fromDiff: %s, toDiff: %s", fromDiff, toDiff)
 
 		requireDecimalEqual(t, fromDiff, toDiff)
-		require.True(t, fromDiff.IsPositive())
-		require.True(t, fromDiff.Mod(amount).IsZero())
+		require.True(t, fromDiff.IsPos())
 
 		// แปลงส่วนต่างเป็นลำดับ transaction แล้วตรวจว่าครบและไม่ซ้ำกัน
 		// ไม่จำเป็นต้องเรียง 1 ถึง n เพราะ goroutine อาจทำเสร็จคนละลำดับกับตอนเริ่ม
-		step := int(fromDiff.Div(amount).IntPart())
+		stepValue, err := fromDiff.QuoExact(amount, 0)
+		require.NoError(t, err)
+		stepNumber, _, ok := stepValue.Int64(0)
+		require.True(t, ok)
+		step := int(stepNumber)
 		require.GreaterOrEqual(t, step, 1)
 		require.LessOrEqual(t, step, n)
 		require.NotContains(t, executed, step)
@@ -107,9 +112,9 @@ func TestTransferTx(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("updatedFromAccount: %+v, updatedToAccount: %+v", updatedFromAccount, updatedToAccount)
-	totalAmount := amount.Mul(decimal.NewFromInt(n))
-	requireDecimalEqual(t, fromAccount.Balance.Sub(totalAmount), updatedFromAccount.Balance)
-	requireDecimalEqual(t, toAccount.Balance.Add(totalAmount), updatedToAccount.Balance)
+	totalAmount := mustMul(t, amount, decimal.MustNew(n, 0))
+	requireDecimalEqual(t, mustSub(t, fromAccount.Balance, totalAmount), updatedFromAccount.Balance)
+	requireDecimalEqual(t, mustAdd(t, toAccount.Balance, totalAmount), updatedToAccount.Balance)
 }
 
 func TestTransferTxDeadlock(t *testing.T) {
@@ -175,12 +180,63 @@ func TestTransferTxRejectsInvalidAmount(t *testing.T) {
 	store := &Store{}
 
 	_, err := store.TransferTx(context.Background(), TransferTxParams{
-		Amount: decimal.Zero,
+		FromAccountID: 1,
+		ToAccountID:   2,
+		Amount:        decimal.Zero,
 	})
-	require.ErrorIs(t, err, ErrInvalidTransferAmount)
+	require.ErrorIs(t, err, common.ErrInvalidAmount)
 
 	_, err = store.TransferTx(context.Background(), TransferTxParams{
-		Amount: mustDecimal("1.23456"),
+		FromAccountID: 1,
+		ToAccountID:   2,
+		Amount:        mustDecimal("1.23456"),
 	})
-	require.ErrorIs(t, err, ErrInvalidTransferAmountPrecision)
+	require.ErrorIs(t, err, common.ErrInvalidAmount)
+
+	_, err = store.TransferTx(context.Background(), TransferTxParams{
+		FromAccountID: 1,
+		ToAccountID:   2,
+		Amount:        mustAdd(t, common.MaxMoneyAmount, mustDecimal("0.0001")),
+	})
+	require.ErrorIs(t, err, common.ErrInvalidAmount)
+}
+
+func TestTransferTxRejectsSameAccount(t *testing.T) {
+	store := &Store{}
+
+	_, err := store.TransferTx(context.Background(), TransferTxParams{
+		FromAccountID: 42,
+		ToAccountID:   42,
+		Amount:        mustDecimal("1.0000"),
+	})
+	require.ErrorIs(t, err, common.ErrSameAccount)
+}
+
+func TestTransferTxRejectsBalanceOverflow(t *testing.T) {
+	store := NewStore(testDB)
+	fromAccount := createRandomAccount(t)
+	toAccount := createRandomAccount(t)
+
+	fromAccount, err := testQueries.UpdateAccount(context.Background(), UpdateAccountParams{
+		ID: fromAccount.ID, Balance: mustDecimal("100.0000"),
+	})
+	require.NoError(t, err)
+	toAccount, err = testQueries.UpdateAccount(context.Background(), UpdateAccountParams{
+		ID: toAccount.ID, Balance: common.MaxMoneyAmount,
+	})
+	require.NoError(t, err)
+
+	_, err = store.TransferTx(context.Background(), TransferTxParams{
+		FromAccountID: fromAccount.ID,
+		ToAccountID:   toAccount.ID,
+		Amount:        mustDecimal("1.0000"),
+	})
+	require.ErrorIs(t, err, common.ErrBalanceLimitExceeded)
+
+	updatedFromAccount, err := testQueries.GetAccount(context.Background(), fromAccount.ID)
+	require.NoError(t, err)
+	updatedToAccount, err := testQueries.GetAccount(context.Background(), toAccount.ID)
+	require.NoError(t, err)
+	requireDecimalEqual(t, fromAccount.Balance, updatedFromAccount.Balance)
+	requireDecimalEqual(t, toAccount.Balance, updatedToAccount.Balance)
 }

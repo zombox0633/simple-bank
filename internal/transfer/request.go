@@ -1,6 +1,6 @@
 package transfer
 
-import "github.com/shopspring/decimal"
+import "github.com/govalues/decimal"
 
 type createTransferRequest struct {
 	FromAccountID int64           `json:"from_account_id" binding:"required,min=1"`

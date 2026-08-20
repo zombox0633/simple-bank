@@ -20,11 +20,10 @@ updated: 2026-08-03
 ## 1. ต่อ DB (pgx)
 ```go
 // main.go
-_ = godotenv.Load()
-conn, _ := sql.Open("pgx", os.Getenv("DB_SOURCE"))  // driver "pgx" (ผ่าน stdlib adapter)
-conn.Ping()                                          // Open ไม่ได้ต่อจริง → Ping บังคับต่อ
+pool, _ := pgxpool.New(context.Background(), os.Getenv("DB_SOURCE"))
+pool.Ping(context.Background()) // บังคับตรวจ connection ตอนเริ่ม app
 ```
-- ใช้ **pgx/v5** ผ่าน `_ "github.com/jackc/pgx/v5/stdlib"` (database/sql) — ไม่ใช้ lib/pq (เก่า)
+- ใช้ **pgx/v5 native API** ผ่าน `pgxpool` — ไม่ผ่าน `database/sql`
 
 ## 2. Config (.env)
 | ไฟล์ | หน้าที่ |
@@ -32,7 +31,7 @@ conn.Ping()                                          // Open ไม่ได้�
 | `.env` | ค่าจริง (DB_SOURCE, SERVER_ADDRESS) — **gitignore ไว้** |
 | `.env.example` | template commit ได้ |
 | `Makefile` | `-include .env` → migrate ใช้ `$(DB_SOURCE)` แหล่งเดียวกับ app |
-- `godotenv.Load()` ทำงานแค่ใน `main.go` (Go process) — Makefile/test ต้องอ่าน .env เอง (test hardcode DSN ไว้)
+- app โหลด `.env` ผ่าน config package; Makefile ส่ง `DB_SOURCE` ให้ test และ test ใช้ localhost เป็น fallback เมื่อไม่ได้กำหนดค่า
 
 ## 3. Security: ปิด password 2 ชั้น
 - **query**: `ListUsers` เลือก column แบบ explicit (ตัด `password`) → ไม่โหลดมาเลย

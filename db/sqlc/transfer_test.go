@@ -45,7 +45,7 @@ func TestGetTransfer(t *testing.T) {
 	require.Equal(t, transfer1.FromAccountID, transfer2.FromAccountID)
 	require.Equal(t, transfer1.ToAccountID, transfer2.ToAccountID)
 	requireDecimalEqual(t, transfer1.Amount, transfer2.Amount)
-	require.WithinDuration(t, transfer1.CreatedAt, transfer2.CreatedAt, time.Second)
+	require.WithinDuration(t, transfer1.CreatedAt.Time, transfer2.CreatedAt.Time, time.Second)
 }
 
 func TestListTransfers(t *testing.T) {
