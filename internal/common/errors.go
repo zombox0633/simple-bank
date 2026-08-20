@@ -1,20 +1,8 @@
 package common
 
-import (
-	"errors"
-
-	"github.com/govalues/decimal"
-)
-
-const (
-	CurrencyUSD = "USD"
-	CurrencyEUR = "EUR"
-	CurrencyTHB = "THB"
-	MoneyScale  = 4
-)
+import "errors"
 
 var (
-	MaxMoneyAmount          = decimal.MustParse("99999999999999.9999")
 	ErrNotFound             = errors.New("resource not found")
 	ErrConflict             = errors.New("resource already exists")
 	ErrInvalidReference     = errors.New("referenced resource not found")
@@ -25,20 +13,3 @@ var (
 	ErrInsufficientBalance  = errors.New("insufficient balance")
 	ErrBalanceLimitExceeded = errors.New("destination account balance limit exceeded")
 )
-
-func IsSupportedCurrency(currency string) bool {
-	switch currency {
-	case CurrencyUSD, CurrencyEUR, CurrencyTHB:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsValidMoneyAmount accepts positive amounts up to MaxMoneyAmount with at most MoneyScale decimal places.
-// Whole numbers such as 10 are valid; NUMERIC(18,4) stores them as 10.0000.
-func IsValidMoneyAmount(amount decimal.Decimal) bool {
-	return amount.IsPos() &&
-		amount.Cmp(MaxMoneyAmount) <= 0 &&
-		amount.MinScale() <= MoneyScale
-}

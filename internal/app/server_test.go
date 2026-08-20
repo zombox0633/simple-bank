@@ -1,4 +1,4 @@
-package server
+package app
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ import (
 
 func TestPing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	apiServer := New(&db.Store{})
+	apiServer := NewServer(&db.Store{})
 	request := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	response := httptest.NewRecorder()
 

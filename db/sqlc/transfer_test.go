@@ -2,9 +2,11 @@ package db
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,6 +34,22 @@ func createRandomTransfer(t *testing.T) Transfer {
 
 func TestCreateTransfer(t *testing.T) {
 	createRandomTransfer(t)
+}
+
+func TestCreateTransferRejectsSameAccount(t *testing.T) {
+	account := createRandomAccount(t)
+
+	_, err := testQueries.CreateTransfer(context.Background(), CreateTransferParams{
+		FromAccountID: account.ID,
+		ToAccountID:   account.ID,
+		Amount:        randomPositiveMoney(),
+	})
+	require.Error(t, err)
+
+	var pgErr *pgconn.PgError
+	require.True(t, errors.As(err, &pgErr))
+	require.Equal(t, SQLStateCheckViolation, pgErr.Code)
+	require.Equal(t, "transfers_different_accounts_check", pgErr.ConstraintName)
 }
 
 func TestGetTransfer(t *testing.T) {

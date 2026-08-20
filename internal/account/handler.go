@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"simplebank/internal/api"
+	"simplebank/internal/httpapi"
 )
 
 type Handler struct {
@@ -19,13 +19,13 @@ func NewHandler(service *Service) *Handler {
 func (handler *Handler) getAccount(ctx *gin.Context) {
 	var request getAccountRequest
 	if err := ctx.ShouldBindUri(&request); err != nil {
-		api.WriteRequestError(ctx, err)
+		httpapi.WriteRequestError(ctx, err)
 		return
 	}
 
 	account, err := handler.service.GetAccount(ctx.Request.Context(), request.ID)
 	if err != nil {
-		api.WriteError(ctx, err)
+		httpapi.WriteError(ctx, err)
 		return
 	}
 
@@ -35,7 +35,7 @@ func (handler *Handler) getAccount(ctx *gin.Context) {
 func (handler *Handler) listAccounts(ctx *gin.Context) {
 	var request listAccountsRequest
 	if err := ctx.ShouldBindQuery(&request); err != nil {
-		api.WriteRequestError(ctx, err)
+		httpapi.WriteRequestError(ctx, err)
 		return
 	}
 
@@ -46,7 +46,7 @@ func (handler *Handler) listAccounts(ctx *gin.Context) {
 		request.PageSize,
 	)
 	if err != nil {
-		api.WriteError(ctx, err)
+		httpapi.WriteError(ctx, err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (handler *Handler) listAccounts(ctx *gin.Context) {
 func (handler *Handler) createAccount(ctx *gin.Context) {
 	var request createAccountRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		api.WriteRequestError(ctx, err)
+		httpapi.WriteRequestError(ctx, err)
 		return
 	}
 
@@ -66,7 +66,7 @@ func (handler *Handler) createAccount(ctx *gin.Context) {
 		request.Currency,
 	)
 	if err != nil {
-		api.WriteError(ctx, err)
+		httpapi.WriteError(ctx, err)
 		return
 	}
 

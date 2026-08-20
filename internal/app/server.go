@@ -1,5 +1,5 @@
-// Package server ประกอบ HTTP server และเชื่อมแต่ละ feature เข้ากับ Gin router
-package server
+// Package app loads application configuration and composes HTTP features.
+package app
 
 import (
 	"net/http"
@@ -7,11 +7,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"simplebank/internal/account"
-	"simplebank/internal/api"
+	"simplebank/internal/httpapi"
 	"simplebank/internal/transfer"
 )
 
-// Store รวมความสามารถด้านฐานข้อมูลที่ทุก feature บน HTTP server ต้องใช้
+// Store combines the database capabilities required by every HTTP feature.
 type Store interface {
 	account.Store
 	transfer.Store
@@ -21,8 +21,8 @@ type Server struct {
 	router *gin.Engine
 }
 
-func New(store Store) *Server {
-	api.RegisterValidators()
+func NewServer(store Store) *Server {
+	httpapi.RegisterValidators()
 
 	router := gin.Default()
 	_ = router.SetTrustedProxies(nil)
@@ -40,7 +40,7 @@ func New(store Store) *Server {
 	return &Server{router: router}
 }
 
-// Handler เปิด http.Handler สำหรับทดสอบ routes โดยไม่ต้องเปิด TCP port จริง
+// Handler exposes the router for tests and net/http without opening a TCP port.
 func (server *Server) Handler() http.Handler {
 	return server.router
 }

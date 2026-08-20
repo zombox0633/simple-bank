@@ -1,4 +1,4 @@
-package config
+package app
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ type Config struct {
 	ServerAddress string `env:"SERVER_ADDRESS" envDefault:":8080"`
 }
 
-func Load() (Config, error) {
+func LoadConfig() (Config, error) {
 	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return Config{}, fmt.Errorf("load .env: %w", err)
 	}

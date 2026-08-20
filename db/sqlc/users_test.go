@@ -6,14 +6,22 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"simplebank/internal/common"
 )
 
 // createRandomUser สร้าง user สุ่ม ไว้ใช้ซ้ำในเทสต์อื่น
 func createRandomUser(t *testing.T) User {
+	t.Helper()
+
 	username := "user_" + randomString(8)
+	plainPassword := "secret"
+	hashedPassword, err := common.HashPassword(plainPassword)
+	require.NoError(t, err)
+
 	arg := CreateUserParams{
 		Username: username,
-		Password: "secret", // db เก็บ string อะไรก็ได้ — จริง ๆ ควรเป็น bcrypt hash
+		Password: hashedPassword,
 		FullName: "Test User",
 		Email:    username + "@test.com", // unique เพราะ username สุ่มไม่ซ้ำ
 	}
@@ -26,6 +34,10 @@ func createRandomUser(t *testing.T) User {
 	require.Equal(t, arg.Password, user.Password)
 	require.Equal(t, arg.FullName, user.FullName)
 	require.Equal(t, arg.Email, user.Email)
+	require.NotEqual(t, plainPassword, user.Password)
+	require.NoError(t, common.CheckPassword(plainPassword, user.Password))
+	require.True(t, user.PasswordChangedAt.Valid)
+	require.True(t, user.PasswordChangedAt.Time.IsZero())
 	require.NotZero(t, user.CreatedAt)
 	require.NotZero(t, user.UpdatedAt)
 
@@ -70,16 +82,24 @@ func TestChangePassword(t *testing.T) {
 	user1 := createRandomUser(t)
 
 	newPassword := "new_" + randomString(6)
-	err := testQueries.ChangePassword(context.Background(), ChangePasswordParams{
+	newPasswordHash, err := common.HashPassword(newPassword)
+	require.NoError(t, err)
+
+	err = testQueries.ChangePassword(context.Background(), ChangePasswordParams{
 		Username: user1.Username,
-		Password: newPassword,
+		Password: newPasswordHash,
 	})
 	require.NoError(t, err)
 
 	user2, err := testQueries.GetUser(context.Background(), user1.Username)
 	require.NoError(t, err)
-	require.Equal(t, newPassword, user2.Password)
+	require.Equal(t, newPasswordHash, user2.Password)
 	require.NotEqual(t, user1.Password, user2.Password)
+	require.NoError(t, common.CheckPassword(newPassword, user2.Password))
+	require.Error(t, common.CheckPassword(newPassword, user1.Password))
+	require.True(t, user2.PasswordChangedAt.Valid)
+	require.WithinDuration(t, time.Now(), user2.PasswordChangedAt.Time, time.Second)
+	require.WithinDuration(t, user2.PasswordChangedAt.Time, user2.UpdatedAt.Time, time.Second)
 }
 
 func TestListUsers(t *testing.T) {

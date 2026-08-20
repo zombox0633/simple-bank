@@ -106,12 +106,12 @@ func TestMapCreateAccountError(t *testing.T) {
 	}{
 		{
 			name: "duplicate account",
-			err:  &pgconn.PgError{Code: "23505"},
+			err:  &pgconn.PgError{Code: db.SQLStateUniqueViolation},
 			want: common.ErrConflict,
 		},
 		{
 			name: "owner not found",
-			err:  &pgconn.PgError{Code: "23503"},
+			err:  &pgconn.PgError{Code: db.SQLStateForeignKeyViolation},
 			want: common.ErrInvalidReference,
 		},
 	}

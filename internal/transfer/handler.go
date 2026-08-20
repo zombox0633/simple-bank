@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/govalues/decimal"
 
-	"simplebank/internal/api"
+	"simplebank/internal/httpapi"
 )
 
 type Handler struct {
@@ -31,7 +31,7 @@ func NewHandler(service *Service) *Handler {
 func (handler *Handler) createTransfer(ctx *gin.Context) {
 	var request createTransferRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		api.WriteRequestError(ctx, err)
+		httpapi.WriteRequestError(ctx, err)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (handler *Handler) createTransfer(ctx *gin.Context) {
 		request.Currency,
 	)
 	if err != nil {
-		api.WriteError(ctx, err)
+		httpapi.WriteError(ctx, err)
 		return
 	}
 

@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	db "simplebank/db/sqlc"
-	"simplebank/internal/api"
 	"simplebank/internal/common"
+	"simplebank/internal/httpapi"
 )
 
 type stubStore struct {
@@ -37,7 +37,7 @@ func (store *stubStore) TransferTx(
 
 func TestCreateTransferAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	api.RegisterValidators()
+	httpapi.RegisterValidators()
 	createdAt := time.Date(2026, time.August, 20, 10, 0, 0, 0, time.UTC)
 
 	tests := []struct {

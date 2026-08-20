@@ -7,7 +7,6 @@ import (
 
 	"github.com/govalues/decimal"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	db "simplebank/db/sqlc"
 	"simplebank/internal/common"
@@ -75,14 +74,11 @@ func (service *Service) ListAccounts(
 }
 
 func mapCreateAccountError(err error) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "23505": // unique_violation: an owner already has this currency
-			return common.ErrConflict
-		case "23503": // foreign_key_violation: owner does not exist
-			return common.ErrInvalidReference
-		}
+	switch db.SQLState(err) {
+	case db.SQLStateUniqueViolation: // an owner already has this currency
+		return common.ErrConflict
+	case db.SQLStateForeignKeyViolation: // owner does not exist
+		return common.ErrInvalidReference
 	}
 
 	return fmt.Errorf("create account: %w", err)

@@ -9,8 +9,14 @@ postgres-down:
 migrateup:
 	migrate -path db/migration -database "$(DB_SOURCE)" -verbose up
 
+migrateup1:
+	migrate -path db/migration -database "$(DB_SOURCE)" -verbose up 1
+
 migratedown:
 	migrate -path db/migration -database "$(DB_SOURCE)" -verbose down -all
+
+migratedown1:
+	migrate -path db/migration -database "$(DB_SOURCE)" -verbose down 1
 
 migratereset:
 	migrate -path db/migration -database "$(DB_SOURCE)" -verbose down -all
@@ -25,4 +31,4 @@ test:
 server:
 	air
 
-.PHONY: postgres postgres-down migrateup migratedown migratereset sqlc test server
+.PHONY: postgres postgres-down migrateup migrateup1 migratedown migratedown1 migratereset sqlc test server

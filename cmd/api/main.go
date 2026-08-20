@@ -15,12 +15,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	db "simplebank/db/sqlc"
-	"simplebank/internal/config"
-	"simplebank/internal/server"
+	"simplebank/internal/app"
 )
 
 func main() {
-	appConfig, err := config.Load()
+	appConfig, err := app.LoadConfig()
 	if err != nil {
 		log.Fatal("cannot load config: ", err)
 	}
@@ -46,7 +45,7 @@ func main() {
 	log.Println("connected to db 😻")
 
 	store := db.NewStore(pool)
-	apiServer := server.New(store)
+	apiServer := app.NewServer(store)
 	httpServer := &http.Server{
 		Addr:              appConfig.ServerAddress,
 		Handler:           apiServer.Handler(),

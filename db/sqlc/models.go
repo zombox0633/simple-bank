@@ -36,10 +36,11 @@ type Transfer struct {
 }
 
 type User struct {
-	Username  string             `json:"username"`
-	Password  string             `json:"-"`
-	FullName  string             `json:"full_name"`
-	Email     string             `json:"email"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	Username          string             `json:"username"`
+	Password          string             `json:"-"`
+	FullName          string             `json:"full_name"`
+	Email             string             `json:"email"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	PasswordChangedAt pgtype.Timestamptz `json:"password_changed_at"`
 }

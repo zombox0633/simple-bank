@@ -1,4 +1,5 @@
-package api
+// Package httpapi contains shared Gin validation and HTTP error responses.
+package httpapi
 
 import (
 	"errors"

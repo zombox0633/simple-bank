@@ -13,7 +13,9 @@ import (
 
 const changePassword = `-- name: ChangePassword :exec
 UPDATE users
-SET password = $2, updated_at = now()
+SET password = $2,
+    password_changed_at = now(),
+    updated_at = now()
 WHERE username = $1
 `
 
@@ -30,7 +32,7 @@ func (q *Queries) ChangePassword(ctx context.Context, arg ChangePasswordParams) 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, password, full_name, email)
 VALUES ($1, $2, $3, $4)
-RETURNING username, password, full_name, email, created_at, updated_at
+RETURNING username, password, full_name, email, created_at, updated_at, password_changed_at
 `
 
 type CreateUserParams struct {
@@ -55,12 +57,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT username, password, full_name, email, created_at, updated_at FROM users
+SELECT username, password, full_name, email, created_at, updated_at, password_changed_at FROM users
 WHERE username = $1 LIMIT 1
 `
 
@@ -74,12 +77,13 @@ func (q *Queries) GetUser(ctx context.Context, username string) (User, error) {
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT username, full_name, email, created_at, updated_at FROM users
+SELECT username, full_name, email, password_changed_at, created_at, updated_at FROM users
 ORDER BY username
 LIMIT $1 OFFSET $2
 `
@@ -90,11 +94,12 @@ type ListUsersParams struct {
 }
 
 type ListUsersRow struct {
-	Username  string             `json:"username"`
-	FullName  string             `json:"full_name"`
-	Email     string             `json:"email"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	Username          string             `json:"username"`
+	FullName          string             `json:"full_name"`
+	Email             string             `json:"email"`
+	PasswordChangedAt pgtype.Timestamptz `json:"password_changed_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
@@ -110,6 +115,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUse
 			&i.Username,
 			&i.FullName,
 			&i.Email,
+			&i.PasswordChangedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -127,7 +133,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET full_name = $2, updated_at = now()
 WHERE username = $1
-RETURNING username, password, full_name, email, created_at, updated_at
+RETURNING username, password, full_name, email, created_at, updated_at, password_changed_at
 `
 
 type UpdateUserParams struct {
@@ -145,6 +151,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }

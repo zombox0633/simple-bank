@@ -8,7 +8,7 @@ SELECT * FROM users
 WHERE username = $1 LIMIT 1;
 
 -- name: ListUsers :many
-SELECT username, full_name, email, created_at, updated_at FROM users
+SELECT username, full_name, email, password_changed_at, created_at, updated_at FROM users
 ORDER BY username
 LIMIT $1 OFFSET $2;
 
@@ -20,5 +20,7 @@ RETURNING *;
 
 -- name: ChangePassword :exec
 UPDATE users
-SET password = $2, updated_at = now()
+SET password = $2,
+    password_changed_at = now(),
+    updated_at = now()
 WHERE username = $1;

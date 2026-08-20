@@ -1,4 +1,4 @@
-package config
+package app
 
 import (
 	"testing"
@@ -6,19 +6,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoad(t *testing.T) {
+func TestLoadConfig(t *testing.T) {
 	t.Setenv("DB_SOURCE", "test-source")
 	t.Setenv("SERVER_ADDRESS", ":9999")
 
-	cfg, err := Load()
+	cfg, err := LoadConfig()
 	require.NoError(t, err)
 	require.Equal(t, "test-source", cfg.DBSource)
 	require.Equal(t, ":9999", cfg.ServerAddress)
 }
 
-func TestLoadRejectsEmptyDBSource(t *testing.T) {
+func TestLoadConfigRejectsEmptyDBSource(t *testing.T) {
 	t.Setenv("DB_SOURCE", "")
 
-	_, err := Load()
+	_, err := LoadConfig()
 	require.Error(t, err)
 }
