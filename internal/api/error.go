@@ -24,6 +24,14 @@ func WriteError(ctx *gin.Context, err error) {
 	switch {
 	case errors.Is(err, common.ErrUnsupportedCurrency):
 		writeError(ctx, http.StatusBadRequest, "UNSUPPORTED_CURRENCY", "currency must be one of USD, EUR, or THB")
+	case errors.Is(err, common.ErrCurrencyMismatch):
+		writeError(ctx, http.StatusBadRequest, "CURRENCY_MISMATCH", common.ErrCurrencyMismatch.Error())
+	case errors.Is(err, common.ErrInvalidAmount):
+		writeError(ctx, http.StatusBadRequest, "INVALID_AMOUNT", common.ErrInvalidAmount.Error())
+	case errors.Is(err, common.ErrSameAccount):
+		writeError(ctx, http.StatusBadRequest, "SAME_ACCOUNT", common.ErrSameAccount.Error())
+	case errors.Is(err, common.ErrInsufficientBalance):
+		writeError(ctx, http.StatusBadRequest, "INSUFFICIENT_BALANCE", common.ErrInsufficientBalance.Error())
 	case errors.Is(err, common.ErrNotFound):
 		writeError(ctx, http.StatusNotFound, "NOT_FOUND", common.ErrNotFound.Error())
 	case errors.Is(err, common.ErrInvalidReference):

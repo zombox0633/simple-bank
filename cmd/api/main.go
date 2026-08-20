@@ -3,19 +3,21 @@ package main
 import (
 	"database/sql"
 	"log"
-	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // register pgx with database/sql
-	"github.com/joho/godotenv"
 
 	db "simplebank/db/sqlc"
+	"simplebank/internal/config"
 	"simplebank/internal/server"
 )
 
 func main() {
-	_ = godotenv.Load()
+	appConfig, err := config.Load()
+	if err != nil {
+		log.Fatal("cannot load config: ", err)
+	}
 
-	conn, err := sql.Open("pgx", os.Getenv("DB_SOURCE"))
+	conn, err := sql.Open(appConfig.DBDriver, appConfig.DBSource)
 	if err != nil {
 		log.Fatal("cannot connect to db: ", err)
 	}
@@ -29,12 +31,7 @@ func main() {
 	store := db.NewStore(conn)
 	apiServer := server.New(store)
 
-	address := os.Getenv("SERVER_ADDRESS")
-	if address == "" {
-		address = ":8080"
-	}
-
-	if err := apiServer.Start(address); err != nil {
+	if err := apiServer.Start(appConfig.ServerAddress); err != nil {
 		log.Fatal("cannot start server 🙀: ", err)
 	}
 }

@@ -7,12 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"simplebank/internal/account"
+	"simplebank/internal/api"
+	"simplebank/internal/transfer"
 )
 
 // Store รวมความสามารถด้านฐานข้อมูลที่ทุก feature บน HTTP server ต้องใช้
-// ตอนนี้มีเฉพาะ account และสามารถ embed interface ของ feature อื่นเพิ่มภายหลัง
 type Store interface {
 	account.Store
+	transfer.Store
 }
 
 type Server struct {
@@ -20,6 +22,8 @@ type Server struct {
 }
 
 func New(store Store) *Server {
+	api.RegisterValidators()
+
 	router := gin.Default()
 	_ = router.SetTrustedProxies(nil)
 
@@ -29,6 +33,9 @@ func New(store Store) *Server {
 
 	accountService := account.NewService(store)
 	account.NewHandler(accountService).RegisterRoutes(router)
+
+	transferService := transfer.NewService(store, accountService)
+	transfer.NewHandler(transferService).RegisterRoutes(router)
 
 	return &Server{router: router}
 }
