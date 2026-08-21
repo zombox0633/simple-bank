@@ -5,9 +5,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"slices"
 
+	z "github.com/Oudwins/zog"
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 
 	"simplebank/internal/common"
 )
@@ -17,21 +18,33 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func WriteRequestError(ctx *gin.Context, err error) {
-	var validationErrors validator.ValidationErrors
-	if errors.As(err, &validationErrors) {
-		for _, validationError := range validationErrors {
-			switch validationError.Tag() {
-			case "money":
-				WriteError(ctx, common.ErrInvalidAmount)
-				return
-			case "currency":
-				WriteError(ctx, common.ErrUnsupportedCurrency)
-				return
-			case "nefield":
-				WriteError(ctx, common.ErrSameAccount)
-				return
-			}
+func WriteRequestIssues(ctx *gin.Context, issues z.ZogIssueList) {
+	slices.SortFunc(issues, func(left *z.ZogIssue, right *z.ZogIssue) int {
+		return slices.Compare(left.Path, right.Path)
+	})
+	for _, issue := range issues {
+		switch issue.Code {
+		case IssueInvalidUsername:
+			WriteError(ctx, common.ErrInvalidUsername)
+			return
+		case IssueInvalidFullName:
+			WriteError(ctx, common.ErrInvalidFullName)
+			return
+		case IssueInvalidEmail:
+			WriteError(ctx, common.ErrInvalidEmail)
+			return
+		case IssueInvalidPassword:
+			WriteError(ctx, common.ErrInvalidPassword)
+			return
+		case IssueInvalidAmount:
+			WriteError(ctx, common.ErrInvalidAmount)
+			return
+		case IssueUnsupportedCurrency:
+			WriteError(ctx, common.ErrUnsupportedCurrency)
+			return
+		case IssueSameAccount:
+			WriteError(ctx, common.ErrSameAccount)
+			return
 		}
 	}
 
@@ -41,12 +54,20 @@ func WriteRequestError(ctx *gin.Context, err error) {
 // WriteError turns reusable application errors into one consistent HTTP shape.
 func WriteError(ctx *gin.Context, err error) {
 	switch {
+	case errors.Is(err, common.ErrInvalidUsername):
+		writeError(ctx, http.StatusBadRequest, "INVALID_USERNAME", common.ErrInvalidUsername.Error())
+	case errors.Is(err, common.ErrInvalidFullName):
+		writeError(ctx, http.StatusBadRequest, "INVALID_FULL_NAME", common.ErrInvalidFullName.Error())
+	case errors.Is(err, common.ErrInvalidEmail):
+		writeError(ctx, http.StatusBadRequest, "INVALID_EMAIL", common.ErrInvalidEmail.Error())
 	case errors.Is(err, common.ErrUnsupportedCurrency):
 		writeError(ctx, http.StatusBadRequest, "UNSUPPORTED_CURRENCY", "currency must be one of USD, EUR, or THB")
 	case errors.Is(err, common.ErrCurrencyMismatch):
 		writeError(ctx, http.StatusBadRequest, "CURRENCY_MISMATCH", common.ErrCurrencyMismatch.Error())
 	case errors.Is(err, common.ErrInvalidAmount):
 		writeError(ctx, http.StatusBadRequest, "INVALID_AMOUNT", common.ErrInvalidAmount.Error())
+	case errors.Is(err, common.ErrInvalidPassword):
+		writeError(ctx, http.StatusBadRequest, "INVALID_PASSWORD", common.ErrInvalidPassword.Error())
 	case errors.Is(err, common.ErrSameAccount):
 		writeError(ctx, http.StatusBadRequest, "SAME_ACCOUNT", common.ErrSameAccount.Error())
 	case errors.Is(err, common.ErrInsufficientBalance):

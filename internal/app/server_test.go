@@ -13,11 +13,11 @@ import (
 
 func TestPing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	apiServer := NewServer(&db.Store{})
+	apiHandler := NewHTTPHandler(&db.Store{})
 	request := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	response := httptest.NewRecorder()
 
-	apiServer.Handler().ServeHTTP(response, request)
+	apiHandler.ServeHTTP(response, request)
 
 	require.Equal(t, http.StatusOK, response.Code)
 	require.JSONEq(t, `{"message":"pong"}`, response.Body.String())

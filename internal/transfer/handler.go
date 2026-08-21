@@ -30,8 +30,7 @@ func NewHandler(service *Service) *Handler {
 
 func (handler *Handler) createTransfer(ctx *gin.Context) {
 	var request createTransferRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		httpapi.WriteRequestError(ctx, err)
+	if !httpapi.BindJSON(ctx, createTransferSchema, &request) {
 		return
 	}
 

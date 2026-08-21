@@ -33,22 +33,24 @@ func main() {
 		return nil
 	}
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 10*time.Second)
+	pool, err := pgxpool.NewWithConfig(startupCtx, poolConfig)
 	if err != nil {
 		log.Fatal("cannot create database pool: ", err)
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(context.Background()); err != nil {
+	if err := pool.Ping(startupCtx); err != nil {
 		log.Fatal("cannot ping db 😹: ", err)
 	}
+	cancelStartup()
 	log.Println("connected to db 😻")
 
 	store := db.NewStore(pool)
-	apiServer := app.NewServer(store)
+	apiHandler := app.NewHTTPHandler(store)
 	httpServer := &http.Server{
 		Addr:              appConfig.ServerAddress,
-		Handler:           apiServer.Handler(),
+		Handler:           apiHandler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

@@ -18,8 +18,7 @@ func NewHandler(service *Service) *Handler {
 
 func (handler *Handler) getAccount(ctx *gin.Context) {
 	var request getAccountRequest
-	if err := ctx.ShouldBindUri(&request); err != nil {
-		httpapi.WriteRequestError(ctx, err)
+	if !httpapi.BindURI(ctx, getAccountSchema, &request) {
 		return
 	}
 
@@ -34,8 +33,7 @@ func (handler *Handler) getAccount(ctx *gin.Context) {
 
 func (handler *Handler) listAccounts(ctx *gin.Context) {
 	var request listAccountsRequest
-	if err := ctx.ShouldBindQuery(&request); err != nil {
-		httpapi.WriteRequestError(ctx, err)
+	if !httpapi.BindQuery(ctx, listAccountsSchema, &request) {
 		return
 	}
 
@@ -55,8 +53,7 @@ func (handler *Handler) listAccounts(ctx *gin.Context) {
 
 func (handler *Handler) createAccount(ctx *gin.Context) {
 	var request createAccountRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		httpapi.WriteRequestError(ctx, err)
+	if !httpapi.BindJSON(ctx, createAccountSchema, &request) {
 		return
 	}
 

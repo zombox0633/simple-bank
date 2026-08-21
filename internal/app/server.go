@@ -7,23 +7,19 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"simplebank/internal/account"
-	"simplebank/internal/httpapi"
 	"simplebank/internal/transfer"
+	"simplebank/internal/user"
 )
 
 // Store combines the database capabilities required by every HTTP feature.
 type Store interface {
 	account.Store
 	transfer.Store
+	user.Store
 }
 
-type Server struct {
-	router *gin.Engine
-}
-
-func NewServer(store Store) *Server {
-	httpapi.RegisterValidators()
-
+// NewHTTPHandler wires every feature into one router without opening a port.
+func NewHTTPHandler(store Store) http.Handler {
 	router := gin.Default()
 	_ = router.SetTrustedProxies(nil)
 
@@ -34,13 +30,11 @@ func NewServer(store Store) *Server {
 	accountService := account.NewService(store)
 	account.NewHandler(accountService).RegisterRoutes(router)
 
+	userService := user.NewService(store)
+	user.NewHandler(userService).RegisterRoutes(router)
+
 	transferService := transfer.NewService(store, accountService)
 	transfer.NewHandler(transferService).RegisterRoutes(router)
 
-	return &Server{router: router}
-}
-
-// Handler exposes the router for tests and net/http without opening a TCP port.
-func (server *Server) Handler() http.Handler {
-	return server.router
+	return router
 }

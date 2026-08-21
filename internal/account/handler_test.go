@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,4 +110,61 @@ func TestGetAccountAPI(t *testing.T) {
 			require.Equal(t, test.wantCode, body.Code)
 		})
 	}
+}
+
+func TestCreateAccountAPI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	want := db.Account{ID: 42, Owner: "alice", Currency: "THB"}
+	store := &stubStore{
+		createAccount: func(_ context.Context, params db.CreateAccountParams) (db.Account, error) {
+			require.Equal(t, want.Owner, params.Owner)
+			require.Equal(t, want.Currency, params.Currency)
+			require.True(t, params.Balance.IsZero())
+			return want, nil
+		},
+	}
+	router := gin.New()
+	NewHandler(NewService(store)).RegisterRoutes(router)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/accounts",
+		strings.NewReader(`{"owner":" Alice ","currency":"thb"}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusCreated, response.Code)
+	wantJSON, err := json.Marshal(want)
+	require.NoError(t, err)
+	require.JSONEq(t, string(wantJSON), response.Body.String())
+}
+
+func TestListAccountsAPI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	want := []db.Account{{ID: 42, Owner: "alice", Currency: "THB"}}
+	store := &stubStore{
+		listAccounts: func(_ context.Context, params db.ListAccountsParams) ([]db.Account, error) {
+			require.Equal(t, "alice", params.Owner)
+			require.Equal(t, int32(25), params.Limit)
+			require.Equal(t, int32(50), params.Offset)
+			return want, nil
+		},
+	}
+	router := gin.New()
+	NewHandler(NewService(store)).RegisterRoutes(router)
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/accounts?owner=Alice&page_id=3&page_size=25",
+		nil,
+	)
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusOK, response.Code)
+	wantJSON, err := json.Marshal(want)
+	require.NoError(t, err)
+	require.JSONEq(t, string(wantJSON), response.Body.String())
 }

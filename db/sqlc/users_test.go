@@ -15,7 +15,7 @@ func createRandomUser(t *testing.T) User {
 	t.Helper()
 
 	username := "user_" + randomString(8)
-	plainPassword := "secret"
+	plainPassword := "Secret123!"
 	hashedPassword, err := common.HashPassword(plainPassword)
 	require.NoError(t, err)
 
@@ -81,7 +81,7 @@ func TestUpdateUser(t *testing.T) {
 func TestChangePassword(t *testing.T) {
 	user1 := createRandomUser(t)
 
-	newPassword := "new_" + randomString(6)
+	newPassword := "New1!" + randomString(6)
 	newPasswordHash, err := common.HashPassword(newPassword)
 	require.NoError(t, err)
 

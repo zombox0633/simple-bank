@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	pgxdecimal "github.com/ColeBurch/pgx-govalues-decimal"
 	"github.com/govalues/decimal"
@@ -45,13 +46,15 @@ func TestMain(m *testing.M) {
 		return nil
 	}
 
-	testDB, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 10*time.Second)
+	testDB, err = pgxpool.NewWithConfig(startupCtx, poolConfig)
 	if err != nil {
 		log.Fatal("failed to create db pool 😿 : ", err)
 	}
-	if err := testDB.Ping(context.Background()); err != nil {
+	if err := testDB.Ping(startupCtx); err != nil {
 		log.Fatal("failed to ping db 😹 : ", err)
 	}
+	cancelStartup()
 	testQueries = New(testDB)
 
 	exitCode := m.Run()

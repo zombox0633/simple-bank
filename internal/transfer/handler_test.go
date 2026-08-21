@@ -16,7 +16,6 @@ import (
 
 	db "simplebank/db/sqlc"
 	"simplebank/internal/common"
-	"simplebank/internal/httpapi"
 )
 
 type stubStore struct {
@@ -37,7 +36,6 @@ func (store *stubStore) TransferTx(
 
 func TestCreateTransferAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	httpapi.RegisterValidators()
 	createdAt := time.Date(2026, time.August, 20, 10, 0, 0, 0, time.UTC)
 
 	tests := []struct {
@@ -90,6 +88,27 @@ func TestCreateTransferAPI(t *testing.T) {
 			store:      &stubStore{},
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "UNSUPPORTED_CURRENCY",
+		},
+		{
+			name:       "SameAccount",
+			body:       `{"from_account_id":1,"to_account_id":1,"amount":"10","currency":"THB"}`,
+			store:      &stubStore{},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "SAME_ACCOUNT",
+		},
+		{
+			name:       "TooManyDecimalPlaces",
+			body:       `{"from_account_id":1,"to_account_id":2,"amount":"10.12345","currency":"THB"}`,
+			store:      &stubStore{},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "INVALID_AMOUNT",
+		},
+		{
+			name:       "FractionalAccountID",
+			body:       `{"from_account_id":1.5,"to_account_id":2,"amount":"10","currency":"THB"}`,
+			store:      &stubStore{},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "INVALID_REQUEST",
 		},
 		{
 			name: "CurrencyMismatch",
